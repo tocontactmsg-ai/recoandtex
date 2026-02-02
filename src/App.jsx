@@ -18,5 +18,11 @@ export default function App() {
       {mode === "tts" && <TextToSpeech />}
       {mode === "conversation" && <ConversationMode />}
     </div>
+    return (
+  <div className="bg-red-600 text-white text-center p-10 text-2xl">
+    TEST DISPLAY
+  </div>
+)
+
   );
 }
