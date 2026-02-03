@@ -1,12 +1,267 @@
+
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="ar">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hearing Assist</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>فاهم</title>
+
+<link rel="manifest" href="manifest.json">
+
+<style>
+:root{
+  --bg:#f5f5f7;
+  --card:#ffffff;
+  --text:#111;
+  --muted:#6e6e73;
+  --accent:#0071e3;
+  --danger:#ff3b30;
+  --radius:20px;
+}
+
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
+  background:var(--bg);
+  display:flex;
+  justify-content:center;
+}
+
+.container{
+  width:100%;
+  max-width:720px;
+  padding:30px;
+}
+
+h1{
+  font-size:32px;
+  font-weight:700;
+  margin-bottom:6px;
+}
+
+.subtitle{
+  color:var(--muted);
+  margin-bottom:25px;
+}
+
+.card{
+  background:var(--card);
+  padding:24px;
+  border-radius:var(--radius);
+  box-shadow:0 20px 50px rgba(0,0,0,0.05);
+  margin-bottom:24px;
+}
+
+.controls{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:15px;
+}
+
+button{
+  flex:1;
+  padding:14px;
+  border:none;
+  border-radius:16px;
+  font-size:15px;
+  cursor:pointer;
+  font-weight:500;
+  transition:0.2s;
+}
+
+button.primary{ background:var(--accent); color:white; }
+button.danger{ background:var(--danger); color:white; }
+button.secondary{ background:#e5e5ea; }
+
+button:hover{ transform:scale(1.02); }
+
+textarea{
+  width:100%;
+  height:260px;
+  border-radius:16px;
+  border:1px solid #e5e5ea;
+  padding:16px;
+  font-size:16px;
+  resize:none;
+  box-sizing:border-box;
+}
+
+select{
+  padding:10px;
+  border-radius:12px;
+  border:1px solid #e5e5ea;
+  margin-bottom:10px;
+  width:100%;
+}
+
+.status{
+  font-size:14px;
+  color:var(--muted);
+  margin-top:10px;
+}
+</style>
 </head>
-<body class="bg-black text-white">
-  <div id="root" class="bg-black text-white min-h-screen"></div>
-  <script type="module" src="/src/main.jsx"></script>
+
+<body>
+
+<div class="container">
+  <h1>فاهم</h1>
+  <div class="subtitle">يتكلم. يكتب.</div>
+
+  <div class="card">
+    <label>Language</label>
+    <select id="language">
+      <option value="ar-SA">Arabic</option>
+      <option value="en-US">English</option>
+    </select>
+
+    <div class="controls">
+      <button class="primary" onclick="startRecognition()">🎙 Start</button>
+      <button class="danger" onclick="stopRecognition()">Stop</button>
+      <button class="secondary" onclick="copyText()">Copy</button>
+    </div>
+
+    <div class="status" id="status">Checking support...</div>
+  </div>
+
+  <div class="card">
+    <textarea id="output" placeholder="تكلم وسيتم تحويل الصوت إلى نص..."></textarea>
+  </div>
+
+  <div class="card">
+    <label>Read With Voice</label>
+    <select id="voiceSelect"></select>
+
+    <div class="controls">
+      <button class="primary" onclick="speakText()">🔊 Read</button>
+      <button class="danger" onclick="stopSpeaking()">Stop Voice</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let recognition;
+let isRecording = false;
+let finalTranscript = "";
+let voices = [];
+
+function init(){
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if(!SpeechRecognition){
+    document.getElementById("status").innerText =
+      "Speech recognition not supported. Use Chrome.";
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  recognition.onstart = () => {
+    isRecording = true;
+    document.getElementById("status").innerText = "Listening...";
+  };
+
+  recognition.onend = () => {
+    if(isRecording) recognition.start();
+    else document.getElementById("status").innerText = "Stopped.";
+  };
+
+  recognition.onresult = (event) => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      let transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        finalTranscript += transcript.trim() + " ";
+      } else {
+        interim += transcript;
+      }
+    }
+    document.getElementById("output").value =
+      finalTranscript + interim;
+  };
+
+  recognition.onerror = (event) => {
+    document.getElementById("status").innerText = "Error: " + event.error;
+  };
+
+  document.getElementById("status").innerText = "Ready.";
+
+  loadVoices();
+}
+
+function startRecognition(){
+  recognition.lang = document.getElementById("language").value;
+  recognition.start();
+}
+
+function stopRecognition(){
+  isRecording = false;
+  recognition.stop();
+}
+
+function copyText(){
+  const text = document.getElementById("output").value;
+  navigator.clipboard.writeText(text);
+  alert("Copied!");
+}
+
+function loadVoices(){
+  voices = speechSynthesis.getVoices();
+  const voiceSelect = document.getElementById("voiceSelect");
+  voiceSelect.innerHTML = "";
+  voices.forEach((voice, i) => {
+    const option = document.createElement("option");
+    option.value = i;
+    option.textContent = voice.name + " (" + voice.lang + ")";
+    voiceSelect.appendChild(option);
+  });
+}
+
+speechSynthesis.onvoiceschanged = loadVoices;
+
+function speakText(){
+  stopSpeaking();
+
+  const text = document.getElementById("output").value;
+  if(!text) return;
+
+  // Human-like phrase split
+  const phrases = text.split(/[.,!?،]/);
+
+  let index = 0;
+
+  function speakNext(){
+    if(index >= phrases.length) return;
+
+    const utter = new SpeechSynthesisUtterance(phrases[index]);
+    utter.voice = voices[document.getElementById("voiceSelect").value];
+    utter.rate = 0.95;
+    utter.pitch = 1;
+    utter.onend = () => {
+      index++;
+      setTimeout(speakNext, 300); // natural pause
+    };
+    speechSynthesis.speak(utter);
+  }
+
+  speakNext();
+}
+
+function stopSpeaking(){
+  speechSynthesis.cancel();
+}
+
+init();
+
+// PWA service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+
 </body>
 </html>
